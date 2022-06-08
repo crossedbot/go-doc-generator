@@ -1,0 +1,2 @@
+# Generate godoc HTML pages every day at 5:00 AM
+0 5 * * * /opt/go-doc-generator/bin/go-doc-cron
