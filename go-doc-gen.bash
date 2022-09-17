@@ -3,7 +3,7 @@
 DEFAULT_GODOC_HTTP_LOCATION="localhost"
 DEFAULT_GODOC_HTTP_PORT="6060"
 DEFAULT_OUTPUT_DIR="godoc"
-DEFAULT_TIMEOUT=30 # seconds
+DEFAULT_TIMEOUT=60 # seconds
 
 # log prints the given arguments to STDOUT with a timestamp prefix
 log()
@@ -51,8 +51,8 @@ get_go_module()
 	echo "${go_module}"
 }
 
-# wait_timeout(pid, milliseconds) waits for a given PID to exit or times out on
-# the given timeout in millseconds.
+# wait_timeout(pid, seconds) waits for a given PID to exit or times out on the
+# given timeout in seconds.
 wait_timeout()
 {
 	local pid=$1; shift;
@@ -117,6 +117,8 @@ if ! wait_timeout $pid $godoc_http $timeout; then
 	kill -0 $pid && kill -9 $pid
 	exit 1
 fi
+log "Sleep for 30s to guarantee the go module is indexed"
+sleep 30
 
 # Get the files recursively and put under the godoc directory
 log "Downloading Go code static files"
@@ -132,6 +134,10 @@ wget \
 	--directory-prefix="${output_dir}" \
 	--no-host-directories \
 	"${gomodule_url}"
+
+log "Set ownership and permissions"
+chown -R www-data:www-data $output_dir
+chmod -R a-x+X $output_dir
 
 # Kill the godoc server
 kill -0 $pid && kill -9 $pid

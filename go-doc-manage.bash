@@ -1,5 +1,6 @@
 #!/bin/bash
 
+CWD="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 DEFAULT_OUTPUT_DIR=""
 DEFAULT_PREFIX="./"
 DEFAULT_REPOS_FILE="go-doc-repos.txt"
@@ -41,13 +42,14 @@ clean_path()
 
 # git_clone_or_pull checks if a given repository exists at <prefix>/<localrepo>,
 # and either clones it if it doesn't exist or pulls the latest from remote on
-# its current branch
+# its current branch.
 git_clone_or_pull()
 {
 	local prefix=$1; shift;
 	prefix=$(clean_path $prefix)
 	local local_repo=$1; shift;
 	local_repo=$(clean_path $local_repo)
+	local use_https=$1; shift;
 
 	# Setup local variables
 	local full_local_repo="${prefix}/${local_repo}"
@@ -58,11 +60,14 @@ git_clone_or_pull()
 	local git_user="$(echo $local_repo | cut -d'/' -f2)"
 	local git_repo="$(echo $local_repo | cut -d'/' -f3)"
 	local remote_repo="git@${git_remote}:${git_user}/${git_repo}.git"
+	if [ $use_https -eq 1 ]; then
+		remote_repo="https://${git_remote}/${git_user}/${git_repo}.git"
+	fi
 
 	# Either clone the remote repo or pull the latest
 	if [ ! -d "${dot_git_dir}" ]; then
-		log "Cloning ${remote_repo} into ${local_repo}"
-		git clone -q $remote_repo $local_repo
+		log "Cloning ${remote_repo} into ${full_local_repo}"
+		git clone -q $remote_repo $full_local_repo
 	else
 		local branch=$(git -C $full_local_repo branch | \
 			sed -n -e 's/^\* \(.*\)/\1/p')
@@ -85,7 +90,7 @@ generate_go_doc()
 	[[ "x${output_dir}" != "x" ]] && args+="-d $(clean_path $output_dir)"
 
 	log "Generating documentation for ${repo}"
-	(cd $path_to && ./go-doc-gen $args)
+	(cd $path_to && $CWD/go-doc-gen $args)
 }
 
 # START #
@@ -93,8 +98,9 @@ generate_go_doc()
 output_dir=$DEFAULT_OUTPUT_DIR
 prefix=$DEFAULT_PREFIX
 repos_file=$DEFAULT_REPOS_FILE
+use_https=0
 
-while getopts "hc:d:p:" opt; do
+while getopts "hc:d:p:x" opt; do
 	case "$opt" in
 		[h?]) usage
 			;;
@@ -104,10 +110,42 @@ while getopts "hc:d:p:" opt; do
                         ;;
                 p) prefix="${OPTARG}"
                         ;;
+		x) use_https=1
+			;;
 	esac
 done
 
+if [ ! -d $prefix ]; then
+	mkdir -p $prefix
+fi
+
+cat <<EOF > "${output_dir}/index.html"
+<html>
+  <head>
+    <title>Go docs</title>
+  </head>
+
+  <body>
+    <h2>Go docs</h2>
+EOF
+
 while read repo; do
-	git_clone_or_pull $prefix $repo
+	# retrieve and generate documentation
+	git_clone_or_pull $prefix $repo $use_https
 	generate_go_doc $repo $prefix $output_dir
+
+	# append repository to index page
+	if [ -f "${output_dir}/pkg/${repo}.html" ]; then
+		cat <<EOF >> "${output_dir}/index.html"
+    <a href="/godoc/pkg/${repo}.html">$(basename $repo)</a>
+    <br />
+EOF
+	fi
 done < $repos_file
+
+cat <<EOF >> "${output_dir}/index.html"
+  </body>
+</html>
+EOF
+chown www-data:www-data "${output_dir}/index.html"
+chmod a-x "${output_dir}/index.html"
