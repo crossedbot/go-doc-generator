@@ -14,13 +14,14 @@ log()
 # usage prints helpful information about the script and exits
 usage()
 {
-	echo -e "$(basename "$0") [-h] [-c <config>] [-d <directory>]
+	echo -e "$(basename "$0") [-h] [-x] [-c <config>] [-d <directory>]
 	[-p <prefix>] -- program to generate static Godoc HTML pages for
 	multiple Git repositories. Repositories are expected to be in the format
 	'<remote_url>/<user>/<repo>'. Paths to repositories are expected to be
 	found at '<prefix>/<remote_url>/<user>/<repo>'.
 Where:
 	-h  show this help text
+	-x  connect to the Git remote using HTTPS instead of SSH
 	-c  path to repository list; default is '${DEFAULT_REPOS_FILE}'
 	-d  output directory prefix for static pages; default is \
 '$DEFAULT_OUTPUT_DIR'
